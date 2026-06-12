@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Monitor Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e17;--card:#111827;--card-border:#1e293b;--card-hover:#1a2332;
+  --text:#e2e8f0;--text-dim:#64748b;--text-bright:#f8fafc;
+  --accent:#3b82f6;--accent2:#8b5cf6;--green:#10b981;--yellow:#f59e0b;
+  --red:#ef4444;--orange:#f97316;--cyan:#06b6d4;--pink:#ec4899;
+  --gradient1:linear-gradient(135deg,#3b82f6,#8b5cf6);
+  --gradient2:linear-gradient(135deg,#10b981,#06b6d4);
+  --gradient3:linear-gradient(135deg,#f59e0b,#f97316);
+  --gradient4:linear-gradient(135deg,#ef4444,#ec4899);
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;min-height:100vh;overflow-x:hidden}
+.header{background:linear-gradient(180deg,rgba(59,130,246,0.08),transparent);border-bottom:1px solid var(--card-border);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.header h1{font-size:20px;font-weight:700;background:var(--gradient1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-right{display:flex;align-items:center;gap:16px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.uptime-text{color:var(--text-dim);font-size:13px}
+.refresh-btn{background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all .2s}
+.refresh-btn:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.dashboard{padding:20px 24px;display:grid;gap:16px;grid-template-columns:repeat(4,1fr)}
+@media(max-width:1400px){.dashboard{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1000px){.dashboard{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.dashboard{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px;transition:all .3s;position:relative;overflow:hidden}
+.card:hover{border-color:rgba(59,130,246,0.3);background:var(--card-hover);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0}
+.card.blue::before{background:var(--gradient1)}
+.card.green::before{background:var(--gradient2)}
+.card.yellow::before{background:var(--gradient3)}
+.card.red::before{background:var(--gradient4)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim)}
+.card-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.card.blue .card-icon{background:rgba(59,130,246,0.15);color:var(--accent)}
+.card.green .card-icon{background:rgba(16,185,129,0.15);color:var(--green)}
+.card.yellow .card-icon{background:rgba(245,158,11,0.15);color:var(--yellow)}
+.card.red .card-icon{background:rgba(239,68,68,0.15);color:var(--red)}
+.big-value{font-size:32px;font-weight:700;color:var(--text-bright);margin-bottom:4px}
+.big-value .unit{font-size:16px;color:var(--text-dim);font-weight:400}
+.sub-text{font-size:12px;color:var(--text-dim)}
+.progress-bar{height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;margin-top:12px}
+.progress-fill{height:100%;border-radius:4px;transition:width 1s ease}
+.progress-fill.blue{background:var(--gradient1)}
+.progress-fill.green{background:var(--gradient2)}
+.progress-fill.yellow{background:var(--gradient3)}
+.progress-fill.red{background:var(--gradient4)}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.mini-item{background:rgba(255,255,255,0.03);border-radius:8px;padding:10px 12px}
+.mini-label{font-size:11px;color:var(--text-dim);margin-bottom:4px}
+.mini-value{font-size:16px;font-weight:600;color:var(--text-bright)}
+.mini-value .unit{font-size:11px;color:var(--text-dim);font-weight:400}
+.card.wide{grid-column:span 2}
+@media(max-width:600px){.card.wide{grid-column:span 1}}
+.card.full{grid-column:span 4}
+@media(max-width:1400px){.card.full{grid-column:span 3}}
+@media(max-width:1000px){.card.full{grid-column:span 2}}
+@media(max-width:600px){.card.full{grid-column:span 1}}
+
+.per-core-bars{margin-top:12px;display:flex;gap:4px;align-items:flex-end;height:60px}
+.per-core-bar{flex:1;background:var(--accent);border-radius:3px 3px 0 0;transition:height .5s ease;min-width:4px;opacity:0.8}
+.per-core-bar:hover{opacity:1}
+
+.disk-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.disk-item:last-child{border-bottom:none}
+.disk-drive{font-size:14px;font-weight:600;color:var(--text-bright);min-width:80px}
+.disk-bar{flex:1}
+.disk-info{font-size:12px;color:var(--text-dim);text-align:right;min-width:100px}
+
+.net-interface{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.net-interface:last-child{border-bottom:none}
+.net-name{font-size:13px;font-weight:600;color:var(--text-bright);display:flex;align-items:center;gap:8px}
+.net-dot{width:6px;height:6px;border-radius:50%}
+.net-dot.up{background:var(--green)}
+.net-dot.down{background:var(--red)}
+.net-detail{font-size:12px;color:var(--text-dim);margin-top:2px}
+
+.gpu-item{padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;margin-bottom:8px}
+.gpu-name{font-size:14px;font-weight:600;color:var(--text-bright);margin-bottom:8px}
+.gpu-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+
+.process-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}
+.process-table th{text-align:left;padding:8px 10px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--card-border);font-size:11px}
+.process-table td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--text)}
+.process-table tr:hover td{background:rgba(59,130,246,0.05)}
+.process-table .name-col{color:var(--text-bright);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.process-table .num-col{text-align:right;font-variant-numeric:tabular-nums}
+.process-bar{height:4px;background:rgba(255,255,255,0.05);border-radius:2px;min-width:60px}
+.process-bar-fill{height:100%;border-radius:2px}
+
+.temp-gauge{display:flex;align-items:center;gap:12px;padding:8px 0}
+.temp-name{font-size:13px;color:var(--text-dim);min-width:80px}
+.temp-bar-container{flex:1;height:20px;background:rgba(255,255,255,0.05);border-radius:10px;overflow:hidden;position:relative}
+.temp-bar-fill{height:100%;border-radius:10px;transition:width .5s ease}
+.temp-value{font-size:14px;font-weight:600;color:var(--text-bright);min-width:50px;text-align:right}
+
+.battery-visual{display:flex;align-items:center;gap:16px;margin-top:12px}
+.battery-icon{width:80px;height:36px;border:2px solid var(--text-dim);border-radius:4px;position:relative;overflow:hidden}
+.battery-icon::after{content:'';position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:4px;height:14px;background:var(--text-dim);border-radius:0 2px 2px 0}
+.battery-fill{height:100%;transition:width .5s ease}
+.battery-percent{font-size:28px;font-weight:700;color:var(--text-bright)}
+.battery-status{font-size:12px;color:var(--text-dim)}
+
+.speedtest-btn{background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;margin-top:8px;transition:all .2s}
+.speedtest-btn:hover{filter:brightness(1.15)}
+.speedtest-btn:disabled{opacity:.5;cursor:not-allowed}
+
+.loading{color:var(--text-dim);font-size:13px;text-align:center;padding:20px}
+.fade-in{animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.footer{text-align:center;padding:20px;color:var(--text-dim);font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>System Monitor</h1>
+  <div class="header-right">
+    <div style="display:flex;align-items:center;gap:8px"><div class="status-dot"></div><span class="uptime-text" id="uptime">Connecting...</span></div>
+    <button class="refresh-btn" onclick="fetchAll()">Refresh</button>
+  </div>
+</div>
+
+<div class="dashboard" id="dashboard">
+  <div class="loading">Loading system data...</div>
+</div>
+
+<div class="footer">System Monitor Dashboard &bull; Auto-refreshes every 3 seconds</div>
+
+<script>
+const API = '';
+let prevNetIO = null;
+let prevDiskIO = null;
+let prevTime = null;
+
+function fmt(bytes, dec=1) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (bytes / Math.pow(k, i)).toFixed(dec) + ' ' + sizes[i];
+}
+
+function fmtRate(bytes, dec=1) {
+  return fmt(bytes, dec) + '/s';
+}
+
+function pctColor(pct) {
+  if (pct > 90) return 'var(--red)';
+  if (pct > 70) return 'var(--yellow)';
+  return 'var(--green)';
+}
+
+function tempColor(temp) {
+  if (temp > 80) return 'var(--red)';
+  if (temp > 60) return 'var(--yellow)';
+  return 'var(--green)';
+}
+
+function card(title, icon, cssClass, content) {
+  return `<div class="card ${cssClass} fade-in">
+    <div class="card-header"><span class="card-title">${title}</span><div class="card-icon">${icon}</div></div>
+    ${content}</div>`;
+}
+
+function renderSystem(d) {
+  return card('System', '💻', 'blue', `
+    <div class="big-value" style="font-size:18px">${d.system || 'Unknown'}</div>
+    <div class="sub-text">${d.hostname || ''} &bull; ${d.processor || 'N/A'}</div>
+    <div class="sub-text" style="margin-top:4px">${d.release || ''}</div>
+    <div class="sub-text" style="margin-top:4px">IP: ${d.ip_address || 'N/A'}</div>
+    <div class="sub-text" style="margin-top:8px">Uptime: ${d.uptime_human || 'N/A'}</div>
+  `);
+}
+
+function renderCPU(d) {
+  const bars = (d.usage_per_core || []).map((u, i) =>
+    `<div class="per-core-bar" style="height:${Math.max(u, 2)}%;background:${pctColor(u)}" title="Core ${i}: ${u}%"></div>`
+  ).join('');
+  return card('CPU', '⚡', 'blue', `
+    <div class="big-value">${d.usage_percent || 0}<span class="unit">%</span></div>
+    <div class="sub-text">${d.brand || d.processor || 'CPU'}</div>
+    <div class="progress-bar"><div class="progress-fill blue" style="width:${d.usage_percent || 0}%;background:${pctColor(d.usage_percent || 0)}"></div></div>
+    <div class="mini-grid">
+      <div class="mini-item"><div class="mini-label">Physical Cores</div><div class="mini-value">${d.count_physical || 'N/A'}</div></div>
+      <div class="mini-item"><div class="mini-label">Logical Cores</div><div class="mini-value">${d.count_logical || 'N/A'}</div></div>
+      <div class="mini-item"><div class="mini-label">Frequency</div><div class="mini-value">${d.freq ? d.freq.current + ' <span class="unit">MHz</span>' : 'N/A'}</div></div>
+      <div class="mini-item"><div class="mini-label">Architecture</div><div class="mini-value">${d.arch || 'N/A'}</div></div>
+    </div>
+    ${d.times ? `<div class="mini-grid" style="margin-top:8px">
+      <div class="mini-item"><div class="mini-label">User</div><div class="mini-value">${d.times.user}<span class="unit">%</span></div></div>
+      <div class="mini-item"><div class="mini-label">System</div><div class="mini-value">${d.times.system}<span class="unit">%</span></div></div>
+      <div class="mini-item"><div class="mini-label">Idle</div><div class="mini-value">${d.times.idle}<span class="unit">%</span></div></div>
+      <div class="mini-item"><div class="mini-label">Interrupt</div><div class="mini-value">${d.times.interrupt}<span class="unit">%</span></div></div>
+    </div>` : ''}
+    ${bars ? `<div class="per-core-bars" style="margin-top:12px">${bars}</div>
+    <div class="sub-text" style="margin-top:4px;text-align:center">Per-core usage</div>` : ''}
+  `);
+}
+
+function renderMemory(d) {
+  const swapPct = d.swap_total > 0 ? d.swap_percent : 0;
+  return card('Memory', '🧠', 'green', `
+    <div class="big-value">${d.percent || 0}<span class="unit">%</span></div>
+    <div class="sub-text">${fmt(d.used)} / ${fmt(d.total)}</div>
+    <div class="progress-bar"><div class="progress-fill green" style="width:${d.percent || 0}%;background:${pctColor(d.percent || 0)}"></div></div>
+    <div class="mini-grid">
+      <div class="mini-item"><div class="mini-label">Available</div><div class="mini-value">${fmt(d.available)}</div></div>
+      <div class="mini-item"><div class="mini-label">Cached</div><div class="mini-value">${fmt(d.cached || 0)}</div></div>
+      <div class="mini-item"><div class="mini-label">Swap Used</div><div class="mini-value">${fmt(d.swap_used)}</div></div>
+      <div class="mini-item"><div class="mini-label">Swap Total</div><div class="mini-value">${fmt(d.swap_total)}</div></div>
+    </div>
+  `);
+}
+
+function renderDisk(d) {
+  const parts = (d.partitions || []).map(p => `
+    <div class="disk-item">
+      <div class="disk-drive">${p.device}</div>
+      <div class="disk-bar">
+        <div class="progress-bar"><div class="progress-fill ${p.percent > 90 ? 'red' : p.percent > 70 ? 'yellow' : 'green'}" style="width:${p.percent}%;background:${pctColor(p.percent)}"></div></div>
+        <div class="sub-text">${p.fstype} &bull; ${p.mountpoint}</div>
+      </div>
+      <div class="disk-info">${p.percent}%<br>${fmt(p.used)} / ${fmt(p.total)}</div>
+    </div>
+  `).join('');
+  let ioText = '';
+  if (d.io && prevDiskIO) {
+    const dt = (Date.now() - prevTime) / 1000;
+    if (dt > 0) {
+      const readRate = (d.io.read_bytes - prevDiskIO.read_bytes) / dt;
+      const writeRate = (d.io.write_bytes - prevDiskIO.write_bytes) / dt;
+      ioText = `<div class="mini-grid" style="margin-top:8px">
+        <div class="mini-item"><div class="mini-label">Read Speed</div><div class="mini-value">${fmtRate(readRate)}</div></div>
+        <div class="mini-item"><div class="mini-label">Write Speed</div><div class="mini-value">${fmtRate(writeRate)}</div></div>
+      </div>`;
+    }
+  }
+  return card('Storage', '💾', 'yellow', `
+    <div style="font-size:14px;font-weight:600;color:var(--text-bright);margin-bottom:8px">Disk Usage</div>
+    ${parts || '<div class="sub-text">No disks detected</div>'}
+    ${ioText}
+  `);
+}
+
+function renderNetwork(d) {
+  const ifaces = (d.interfaces || []).map(iface => `
+    <div class="net-interface">
+      <div class="net-name"><div class="net-dot ${iface.is_up ? 'up' : 'down'}"></div>${iface.name}</div>
+      ${iface.addresses.filter(a => a.family.includes('AF_INET') && a.address).map(a => `<div class="net-detail">${a.address}</div>`).join('')}
+      ${iface.speed ? `<div class="net-detail">Speed: ${iface.speed} Mbps &bull; MTU: ${iface.mtu}</div>` : ''}
+    </div>
+  `).join('');
+  let rateText = '';
+  if (d.io && prevNetIO) {
+    const dt = (Date.now() - prevTime) / 1000;
+    if (dt > 0) {
+      const sentRate = (d.io.bytes_sent - prevNetIO.bytes_sent) / dt;
+      const recvRate = (d.io.bytes_recv - prevNetIO.bytes_recv) / dt;
+      rateText = `<div class="mini-grid" style="margin-top:12px">
+        <div class="mini-item"><div class="mini-label">Upload</div><div class="mini-value">${fmtRate(sentRate)}</div></div>
+        <div class="mini-item"><div class="mini-label">Download</div><div class="mini-value">${fmtRate(recvRate)}</div></div>
+        <div class="mini-item"><div class="mini-label">Total Sent</div><div class="mini-value">${fmt(d.io.bytes_sent)}</div></div>
+        <div class="mini-item"><div class="mini-label">Total Recv</div><div class="mini-value">${fmt(d.io.bytes_recv)}</div></div>
+      </div>`;
+    }
+  }
+  return card('Network', '🌐', 'blue', `
+    <div style="font-size:14px;font-weight:600;color:var(--text-bright);margin-bottom:8px">Interfaces</div>
+    ${ifaces || '<div class="sub-text">No interfaces</div>'}
+    ${rateText}
+  `);
+}
+
+function renderGPU(d) {
+  if (!d || d.length === 0) {
+    return card('GPU', '🎮', 'green', '<div class="sub-text">No GPU detected</div>');
+  }
+  const items = d.map(g => `
+    <div class="gpu-item">
+      <div class="gpu-name">${g.name}</div>
+      ${g.load !== undefined ? `<div class="progress-bar"><div class="progress-fill green" style="width:${g.load}%;background:${pctColor(g.load)}"></div></div>
+      <div class="sub-text">Load: ${g.load}%</div>` : ''}
+      ${g.memory_total ? `<div class="mini-grid" style="margin-top:8px">
+        <div class="mini-item"><div class="mini-label">VRAM Used</div><div class="mini-value">${g.memory_used} <span class="unit">MB</span></div></div>
+        <div class="mini-item"><div class="mini-label">VRAM Total</div><div class="mini-value">${g.memory_total} <span class="unit">MB</span></div></div>
+        ${g.temperature ? `<div class="mini-item"><div class="mini-label">Temperature</div><div class="mini-value" style="color:${tempColor(g.temperature)}">${g.temperature}<span class="unit">°C</span></div></div>` : ''}
+      </div>` : ''}
+      ${g.driver_version ? `<div class="sub-text" style="margin-top:4px">Driver: ${g.driver_version}</div>` : ''}
+    </div>
+  `).join('');
+  return card('GPU', '🎮', 'green', items);
+}
+
+function renderTemperatures(d) {
+  const gauges = [];
+  if (d.cpu) {
+    gauges.push(tempGauge('CPU', d.cpu.current, d.cpu.high || 100, d.cpu.critical || 105));
+  }
+  if (d.gpu) {
+    gauges.push(tempGauge('GPU', d.gpu.current, d.gpu.high || 90, d.gpu.critical || 100));
+  }
+  if (d.disks && d.disks.length) {
+    d.disks.forEach(t => gauges.push(tempGauge(t.name, t.current, 60, 70)));
+  }
+  if (gauges.length === 0) {
+    gauges.push('<div class="sub-text">No temperature sensors detected</div>');
+  }
+  return card('Temperatures', '🌡️', 'red', gauges.join(''));
+}
+
+function tempGauge(name, value, high, critical) {
+  const pct = Math.min((value / critical) * 100, 100);
+  return `<div class="temp-gauge">
+    <div class="temp-name">${name}</div>
+    <div class="temp-bar-container"><div class="temp-bar-fill" style="width:${pct}%;background:${tempColor(value)}"></div></div>
+    <div class="temp-value" style="color:${tempColor(value)}">${value}°C</div>
+  </div>`;
+}
+
+function renderFans(d) {
+  if (!d || d.length === 0) {
+    return card('Fans', '🌀', 'blue', '<div class="sub-text">No fan sensors detected</div>');
+  }
+  const items = d.map(f => `
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+      <span style="color:var(--text-dim);font-size:13px">${f.label || f.name}</span>
+      <span style="color:var(--text-bright);font-weight:600;font-size:13px">${f.current || f.desired_speed || 'N/A'} RPM</span>
+    </div>
+  `).join('');
+  return card('Fans', '🌀', 'blue', items);
+}
+
+function renderBattery(d) {
+  if (!d) {
+    return card('Battery', '🔋', 'green', '<div class="sub-text">No battery detected (Desktop)</div>');
+  }
+  const bColor = d.percent > 50 ? 'var(--green)' : d.percent > 20 ? 'var(--yellow)' : 'var(--red)';
+  return card('Battery', '🔋', 'green', `
+    <div class="battery-visual">
+      <div class="battery-icon"><div class="battery-fill" style="width:${d.percent}%;background:${bColor}"></div></div>
+      <div>
+        <div class="battery-percent">${d.percent}%</div>
+        <div class="battery-status">${d.power_plugged ? 'Plugged In' : 'On Battery'} &bull; ${d.time_left}</div>
+      </div>
+    </div>
+  `);
+}
+
+function renderProcesses(d) {
+  const rows = (d || []).slice(0, 25).map(p => `
+    <tr>
+      <td class="name-col" title="${p.name}">${p.name}</td>
+      <td class="num-col">${p.pid}</td>
+      <td class="num-col"><div class="process-bar"><div class="process-bar-fill" style="width:${Math.min(p.cpu_percent, 100)}%;background:${pctColor(p.cpu_percent)}"></div></div>${p.cpu_percent}%</td>
+      <td class="num-col"><div class="process-bar"><div class="process-bar-fill" style="width:${Math.min(p.memory_percent, 100)}%;background:${pctColor(p.memory_percent)}"></div></div>${p.memory_percent}%</td>
+      <td class="num-col">${fmt(p.memory_rss)}</td>
+      <td>${p.status || ''}</td>
+    </tr>
+  `).join('');
+  return card('Top Processes', '📊', 'blue', `
+    <div style="overflow-x:auto">
+      <table class="process-table">
+        <thead><tr><th>Name</th><th style="text-align:right">PID</th><th style="text-align:right">CPU</th><th style="text-align:right">Memory</th><th style="text-align:right">RSS</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `, 'full');
+}
+
+async function fetchAll() {
+  try {
+    const res = await fetch(API + '/api/all');
+    const d = await res.json();
+    const now = Date.now();
+
+    const html = [
+      renderSystem(d.system),
+      renderCPU(d.cpu),
+      renderMemory(d.memory),
+      renderBattery(d.battery),
+      renderGPU(d.gpu),
+      renderDisk(d.disk),
+      renderNetwork(d.network),
+      renderTemperatures(d.temperatures),
+      renderFans(d.fans),
+      renderProcesses([]),
+    ].join('');
+
+    document.getElementById('dashboard').innerHTML = html;
+    document.getElementById('uptime').textContent = `Uptime: ${d.system.uptime_human}`;
+
+    prevNetIO = d.network.io;
+    prevDiskIO = d.disk.io;
+    prevTime = now;
+
+    // fetch processes separately
+    const procRes = await fetch(API + '/api/processes');
+    const procs = await procRes.json();
+    const procCard = document.querySelector('.card.full');
+    if (procCard) {
+      procCard.outerHTML = renderProcesses(procs);
+    }
+  } catch (e) {
+    document.getElementById('dashboard').innerHTML = `<div class="loading" style="grid-column:span 4">
+      <div style="font-size:18px;margin-bottom:8px">Connection Error</div>
+      <div>Cannot reach the server. Make sure app.py is running.</div>
+      <div style="margin-top:8px;color:var(--accent)">python app.py</div>
+    </div>`;
+  }
+}
+
+fetchAll();
+setInterval(fetchAll, 3000);
+</script>
+</body>
+</html>
